@@ -1,6 +1,6 @@
 import React from 'react';
-import type { CVData } from '../types';
-import { BrainCircuit, Trash } from './Icons';
+import type { CVData, Experience, Education, Certification, Language, SkillCategory } from '../types';
+import { BrainCircuit, Trash, User, Briefcase, GraduationCap, Award, Globe, Code, ChevronDown } from './Icons';
 
 // Add global declarations for CDN scripts to satisfy TypeScript
 declare const pdfjsLib: any;
@@ -39,6 +39,31 @@ const templates = [
     { name: 'Modern', value: 'modern' },
 ];
 
+const AccordionItem: React.FC<{ title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }> = ({ title, icon, children, defaultOpen = false }) => {
+    const [isOpen, setIsOpen] = React.useState(defaultOpen);
+
+    return (
+        <div className="bg-white rounded-lg shadow-md mb-4">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between p-4 font-semibold text-lg text-gray-800"
+            >
+                <div className="flex items-center gap-3">
+                    {icon}
+                    <span>{title}</span>
+                </div>
+                <ChevronDown size={24} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <div className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-full' : 'max-h-0'}`}>
+                <div className="p-4 border-t border-gray-200">
+                    {children}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 const CVEditor: React.FC<CVEditorProps> = ({ data, setData, onParseResume, isParsing, theme, setTheme, font, setFont, template, setTemplate, fetchCompanyLogo }) => {
   const [resumeText, setResumeText] = React.useState('');
   const [ocrStatus, setOcrStatus] = React.useState<string>('');
@@ -61,7 +86,6 @@ const CVEditor: React.FC<CVEditorProps> = ({ data, setData, onParseResume, isPar
     } else {
         alert('Unsupported file type. Please upload a .txt or .pdf file.');
     }
-    // Reset file input to allow uploading the same file again
     if(fileInputRef.current) {
         fileInputRef.current.value = '';
     }
@@ -132,14 +156,37 @@ const CVEditor: React.FC<CVEditorProps> = ({ data, setData, onParseResume, isPar
   const handleSimpleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     const keys = name.split('.');
-    if (keys.length === 1) {
-      setData(prev => ({ ...prev, [name]: value }));
-    } else if (keys.length === 2) {
-      setData(prev => ({
-        ...prev,
-        [keys[0]]: { ...(prev as any)[keys[0]], [keys[1]]: value }
-      }));
-    }
+    setData(prev => {
+        const newData = JSON.parse(JSON.stringify(prev));
+        let current = newData;
+        for (let i = 0; i < keys.length - 1; i++) {
+            current = current[keys[i]];
+        }
+        current[keys[keys.length - 1]] = value;
+        return newData;
+    });
+  };
+
+  const handleArrayChange = <T,>(section: keyof CVData, index: number, field: keyof T, value: any) => {
+    setData(prev => {
+      const newArray = [...(prev[section] as any[])] as T[];
+      newArray[index] = { ...newArray[index], [field]: value };
+      return { ...prev, [section]: newArray };
+    });
+  };
+  
+  const addArrayItem = (section: keyof CVData, newItem: any) => {
+    setData(prev => ({
+      ...prev,
+      [section]: [...(prev[section] as any[]), newItem]
+    }));
+  };
+
+  const removeArrayItem = (section: keyof CVData, index: number) => {
+    setData(prev => ({
+      ...prev,
+      [section]: (prev[section] as any[]).filter((_, i) => i !== index)
+    }));
   };
 
   const handleSkillCategoryChange = (catIndex: number, value: string) => {
@@ -167,23 +214,17 @@ const CVEditor: React.FC<CVEditorProps> = ({ data, setData, onParseResume, isPar
   };
 
   const addSkillCategory = () => {
-      setData(prev => ({
-          ...prev,
-          skills: [...prev.skills, { name: 'New Category', skills: ['New Skill'] }]
-      }));
+      addArrayItem('skills', { name: 'New Category', skills: ['New Skill'] });
   };
 
   const removeSkillCategory = (catIndex: number) => {
-      const newSkills = [...data.skills];
-      newSkills.splice(catIndex, 1);
-      setData(prev => ({ ...prev, skills: newSkills }));
+      removeArrayItem('skills', catIndex);
   };
-
 
   const isProcessing = isParsing || !!ocrStatus;
 
   return (
-    <div className="w-full lg:w-2/5 p-8 bg-gray-100 h-screen overflow-y-auto print-hidden">
+    <div className="w-full lg:w-2/5 p-4 sm:p-8 bg-gray-100 h-screen overflow-y-auto print-hidden">
       <h2 className="text-2xl font-bold mb-6 text-gray-800">Resume Editor</h2>
       
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">
@@ -212,8 +253,7 @@ const CVEditor: React.FC<CVEditorProps> = ({ data, setData, onParseResume, isPar
         )}
       </div>
 
-      <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-        <h3 className="text-lg font-semibold mb-4 text-gray-800">Appearance</h3>
+      <AccordionItem title="Appearance" icon={<div className="w-5 h-5 rounded-full" style={{background: 'linear-gradient(45deg, #2563eb, #7c3aed, #0d9488)'}} />}>
         <div className="space-y-4">
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Color Theme</label>
@@ -236,52 +276,110 @@ const CVEditor: React.FC<CVEditorProps> = ({ data, setData, onParseResume, isPar
                 </select>
             </div>
         </div>
-      </div>
+      </AccordionItem>
       
-      <div className={`space-y-6 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="font-semibold mb-2 text-gray-700">Personal Details</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className={`mt-6 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
+        <AccordionItem title="Personal Details" icon={<User size={20}/>} defaultOpen>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input name="name" value={data.name} onChange={handleSimpleChange} placeholder="Full Name" className="p-2 border rounded" />
               <input name="title" value={data.title} onChange={handleSimpleChange} placeholder="Job Title" className="p-2 border rounded" />
               <input name="contact.email" value={data.contact.email} onChange={handleSimpleChange} placeholder="Email" className="p-2 border rounded" />
               <input name="contact.phone" value={data.contact.phone} onChange={handleSimpleChange} placeholder="Phone" className="p-2 border rounded" />
               <input name="contact.location" value={data.contact.location} onChange={handleSimpleChange} placeholder="Location" className="p-2 border rounded" />
               <input name="contact.github" value={data.contact.github} onChange={handleSimpleChange} placeholder="GitHub URL" className="p-2 border rounded" />
-              <input name="contact.linkedin" value={data.contact.linkedin} onChange={handleSimpleChange} placeholder="LinkedIn URL" className="p-2 border rounded" />
-          </div>
-           <textarea name="summary" value={data.summary} onChange={handleSimpleChange} placeholder="Summary" className="w-full mt-4 p-2 border rounded h-24" />
-        </div>
+              <input name="contact.linkedin" value={data.contact.linkedin} onChange={handleSimpleChange} placeholder="LinkedIn URL" className="p-2 border rounded md:col-span-2" />
+            </div>
+            <textarea name="summary" value={data.summary} onChange={handleSimpleChange} placeholder="Summary" className="w-full mt-4 p-2 border rounded h-24" />
+        </AccordionItem>
+
+        <AccordionItem title="Professional Experience" icon={<Briefcase size={20}/>}>
+            <div className="space-y-4">
+                {data.experience.map((job, index) => (
+                    <div key={index} className="p-3 border rounded-md bg-gray-50/80 relative">
+                        <button onClick={() => removeArrayItem('experience', index)} className="absolute top-2 right-2 text-gray-400 hover:text-red-600 p-1"><Trash size={16} /></button>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <input value={job.role} onChange={e => handleArrayChange<Experience>('experience', index, 'role', e.target.value)} placeholder="Role" className="p-2 border rounded" />
+                            <input value={job.company} onBlur={() => fetchCompanyLogo(index)} onChange={e => handleArrayChange<Experience>('experience', index, 'company', e.target.value)} placeholder="Company" className="p-2 border rounded" />
+                            <input value={job.period} onChange={e => handleArrayChange<Experience>('experience', index, 'period', e.target.value)} placeholder="Period (e.g., Oct 2025 – Present)" className="p-2 border rounded" />
+                            <input value={job.location} onChange={e => handleArrayChange<Experience>('experience', index, 'location', e.target.value)} placeholder="Location" className="p-2 border rounded" />
+                        </div>
+                        <textarea
+                            value={job.description.join('\n')}
+                            onChange={e => handleArrayChange<Experience>('experience', index, 'description', e.target.value.split('\n'))}
+                            placeholder="Description (one bullet point per line)..."
+                            className="w-full mt-3 p-2 border rounded h-24"
+                        />
+                    </div>
+                ))}
+                <button onClick={() => addArrayItem('experience', { role: '', company: '', period: '', location: '', description: [''], logoUrl: '' })} className="w-full mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 text-sm">
+                    + Add Experience
+                </button>
+            </div>
+        </AccordionItem>
+
+        <AccordionItem title="Education" icon={<GraduationCap size={20}/>}>
+            <div className="space-y-4">
+                {data.education.map((edu, index) => (
+                    <div key={index} className="p-3 border rounded-md bg-gray-50/80 relative">
+                        <button onClick={() => removeArrayItem('education', index)} className="absolute top-2 right-2 text-gray-400 hover:text-red-600 p-1"><Trash size={16} /></button>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <input value={edu.degree} onChange={e => handleArrayChange<Education>('education', index, 'degree', e.target.value)} placeholder="Degree" className="p-2 border rounded" />
+                            <input value={edu.university} onChange={e => handleArrayChange<Education>('education', index, 'university', e.target.value)} placeholder="University" className="p-2 border rounded" />
+                            <input value={edu.period} onChange={e => handleArrayChange<Education>('education', index, 'period', e.target.value)} placeholder="Period (e.g., 2021-2023)" className="p-2 border rounded" />
+                        </div>
+                        <input value={edu.thesis} onChange={e => handleArrayChange<Education>('education', index, 'thesis', e.target.value)} placeholder="Thesis Title" className="w-full mt-3 p-2 border rounded" />
+                    </div>
+                ))}
+                <button onClick={() => addArrayItem('education', { degree: '', university: '', period: '', thesis: '' })} className="w-full mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 text-sm">
+                    + Add Education
+                </button>
+            </div>
+        </AccordionItem>
+
+        <AccordionItem title="Certifications" icon={<Award size={20}/>}>
+            <div className="space-y-4">
+                {data.certifications.map((cert, index) => (
+                    <div key={index} className="p-3 border rounded-md bg-gray-50/80 relative">
+                        <button onClick={() => removeArrayItem('certifications', index)} className="absolute top-2 right-2 text-gray-400 hover:text-red-600 p-1"><Trash size={16} /></button>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <input value={cert.name} onChange={e => handleArrayChange<Certification>('certifications', index, 'name', e.target.value)} placeholder="Certification Name" className="p-2 border rounded md:col-span-2" />
+                            <input value={cert.link} onChange={e => handleArrayChange<Certification>('certifications', index, 'link', e.target.value)} placeholder="Link to Certificate" className="p-2 border rounded" />
+                            <input value={cert.logoUrl} onChange={e => handleArrayChange<Certification>('certifications', index, 'logoUrl', e.target.value)} placeholder="Logo Image URL" className="p-2 border rounded" />
+                        </div>
+                    </div>
+                ))}
+                <button onClick={() => addArrayItem('certifications', { name: '', link: '', logoUrl: '' })} className="w-full mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 text-sm">
+                    + Add Certification
+                </button>
+            </div>
+        </AccordionItem>
+
+        <AccordionItem title="Languages" icon={<Globe size={20}/>}>
+             <div className="space-y-4">
+                {data.languages.map((lang, index) => (
+                    <div key={index} className="p-3 border rounded-md bg-gray-50/80 relative">
+                        <button onClick={() => removeArrayItem('languages', index)} className="absolute top-2 right-2 text-gray-400 hover:text-red-600 p-1"><Trash size={16} /></button>
+                        <div className="grid grid-cols-2 gap-4 items-center">
+                            <input value={lang.name} onChange={e => handleArrayChange<Language>('languages', index, 'name', e.target.value)} placeholder="Language" className="p-2 border rounded" />
+                            <input value={lang.level} onChange={e => handleArrayChange<Language>('languages', index, 'level', e.target.value)} placeholder="Level (e.g., B2)" className="p-2 border rounded" />
+                            <div className="col-span-2">
+                                <label className="text-sm text-gray-600">Proficiency: {lang.proficiency}%</label>
+                                <input type="range" min="0" max="100" step="5" value={lang.proficiency} onChange={e => handleArrayChange<Language>('languages', index, 'proficiency', parseInt(e.target.value, 10))} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+                            </div>
+                            <input value={lang.icon.split('/').pop()?.split('.')[0]} onChange={e => handleArrayChange<Language>('languages', index, 'icon', `https://flagcdn.com/w20/${e.target.value.toLowerCase()}.png`)} placeholder="2-letter country code" className="p-2 border rounded col-span-2" />
+                        </div>
+                    </div>
+                ))}
+                <button onClick={() => addArrayItem('languages', { name: '', level: '', proficiency: 50, icon: '' })} className="w-full mt-2 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 text-sm">
+                    + Add Language
+                </button>
+            </div>
+        </AccordionItem>
         
-        <div className="bg-white p-4 rounded-lg shadow">
-            <h3 className="font-semibold mb-2 text-gray-700">Professional Experience</h3>
-            {data.experience.map((job, index) => (
-                <div key={index} className="mb-4 p-2 border-b">
-                    <input value={job.role} onChange={e => {
-                        const newExp = [...data.experience];
-                        newExp[index].role = e.target.value;
-                        setData(prev => ({...prev, experience: newExp}));
-                    }} placeholder="Role" className="p-2 border rounded w-full mb-2" />
-                    <input 
-                      value={job.company} 
-                      onBlur={() => fetchCompanyLogo(index)}
-                      onChange={e => {
-                        const newExp = [...data.experience];
-                        newExp[index].company = e.target.value;
-                        setData(prev => ({...prev, experience: newExp}));
-                      }} 
-                      placeholder="Company" 
-                      className="p-2 border rounded w-full" 
-                    />
-                </div>
-            ))}
-        </div>
-        
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h3 className="font-semibold mb-2 text-gray-700">Skills</h3>
+        <AccordionItem title="Skills" icon={<Code size={20}/>}>
           <div className="space-y-4">
             {data.skills.map((category, catIndex) => (
-              <div key={catIndex} className="p-3 border rounded-md bg-gray-50">
+              <div key={catIndex} className="p-3 border rounded-md bg-gray-50/80">
                 <div className="flex items-center mb-2">
                   <input
                     value={category.name}
@@ -299,7 +397,7 @@ const CVEditor: React.FC<CVEditorProps> = ({ data, setData, onParseResume, isPar
                       <textarea
                         value={skill}
                         onChange={(e) => handleSkillChange(catIndex, skillIndex, e.target.value)}
-                        placeholder="Skill (e.g., <strong>React</strong>)"
+                        placeholder="Skill"
                         className="p-2 border rounded w-full text-sm"
                         rows={1}
                         style={{ resize: 'vertical' }}
@@ -319,7 +417,7 @@ const CVEditor: React.FC<CVEditorProps> = ({ data, setData, onParseResume, isPar
           <button onClick={addSkillCategory} className="mt-4 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 text-sm w-full">
             + Add Skill Category
           </button>
-        </div>
+        </AccordionItem>
       </div>
     </div>
   );
