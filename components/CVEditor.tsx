@@ -1,6 +1,6 @@
 import React from 'react';
 import type { CVData } from '../types';
-import { BrainCircuit } from './Icons';
+import { BrainCircuit, Trash } from './Icons';
 
 // Add global declarations for CDN scripts to satisfy TypeScript
 declare const pdfjsLib: any;
@@ -142,6 +142,44 @@ const CVEditor: React.FC<CVEditorProps> = ({ data, setData, onParseResume, isPar
     }
   };
 
+  const handleSkillCategoryChange = (catIndex: number, value: string) => {
+    const newSkills = [...data.skills];
+    newSkills[catIndex] = { ...newSkills[catIndex], name: value };
+    setData(prev => ({ ...prev, skills: newSkills }));
+  };
+
+  const handleSkillChange = (catIndex: number, skillIndex: number, value: string) => {
+      const newSkills = JSON.parse(JSON.stringify(data.skills));
+      newSkills[catIndex].skills[skillIndex] = value;
+      setData(prev => ({ ...prev, skills: newSkills }));
+  };
+
+  const addSkill = (catIndex: number) => {
+      const newSkills = JSON.parse(JSON.stringify(data.skills));
+      newSkills[catIndex].skills.push('New Skill');
+      setData(prev => ({ ...prev, skills: newSkills }));
+  };
+
+  const removeSkill = (catIndex: number, skillIndex: number) => {
+      const newSkills = JSON.parse(JSON.stringify(data.skills));
+      newSkills[catIndex].skills.splice(skillIndex, 1);
+      setData(prev => ({ ...prev, skills: newSkills }));
+  };
+
+  const addSkillCategory = () => {
+      setData(prev => ({
+          ...prev,
+          skills: [...prev.skills, { name: 'New Category', skills: ['New Skill'] }]
+      }));
+  };
+
+  const removeSkillCategory = (catIndex: number) => {
+      const newSkills = [...data.skills];
+      newSkills.splice(catIndex, 1);
+      setData(prev => ({ ...prev, skills: newSkills }));
+  };
+
+
   const isProcessing = isParsing || !!ocrStatus;
 
   return (
@@ -237,6 +275,50 @@ const CVEditor: React.FC<CVEditorProps> = ({ data, setData, onParseResume, isPar
                     />
                 </div>
             ))}
+        </div>
+        
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="font-semibold mb-2 text-gray-700">Skills</h3>
+          <div className="space-y-4">
+            {data.skills.map((category, catIndex) => (
+              <div key={catIndex} className="p-3 border rounded-md bg-gray-50">
+                <div className="flex items-center mb-2">
+                  <input
+                    value={category.name}
+                    onChange={(e) => handleSkillCategoryChange(catIndex, e.target.value)}
+                    placeholder="Category Name"
+                    className="p-2 border rounded w-full font-medium"
+                  />
+                  <button onClick={() => removeSkillCategory(catIndex)} className="ml-2 text-gray-500 hover:text-red-600 p-1 transition-colors flex-shrink-0">
+                    <Trash size={18} />
+                  </button>
+                </div>
+                <div className="pl-4 space-y-2">
+                  {category.skills.map((skill, skillIndex) => (
+                    <div key={skillIndex} className="flex items-start">
+                      <textarea
+                        value={skill}
+                        onChange={(e) => handleSkillChange(catIndex, skillIndex, e.target.value)}
+                        placeholder="Skill (e.g., <strong>React</strong>)"
+                        className="p-2 border rounded w-full text-sm"
+                        rows={1}
+                        style={{ resize: 'vertical' }}
+                      />
+                      <button onClick={() => removeSkill(catIndex, skillIndex)} className="ml-2 mt-2 text-gray-500 hover:text-red-600 p-1 transition-colors flex-shrink-0">
+                        <Trash size={16} />
+                      </button>
+                    </div>
+                  ))}
+                  <button onClick={() => addSkill(catIndex)} className="text-sm text-blue-600 hover:underline pt-1">
+                    + Add Skill
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button onClick={addSkillCategory} className="mt-4 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 text-sm w-full">
+            + Add Skill Category
+          </button>
         </div>
       </div>
     </div>

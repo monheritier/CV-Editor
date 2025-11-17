@@ -121,3 +121,10 @@ export const Building: React.FC<IconProps> = ({ size = 24, className }) => (
         <path d="M16 14h.01"></path><path d="M8 10h.01"></path><path d="M8 14h.01"></path>
     </svg>
 );
+
+export const Trash: React.FC<IconProps> = ({ size = 24, className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="3 6 5 6 21 6"></polyline>
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+  </svg>
+);

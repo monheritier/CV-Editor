@@ -9,6 +9,8 @@ interface EditableFieldProps {
   className?: string;
   placeholder?: string;
   isTextarea?: boolean;
+  // Fix: Allow any other props to be passed to the component, such as 'href' for anchor tags.
+  [x: string]: any;
 }
 
 const EditableField: React.FC<EditableFieldProps> = ({
@@ -19,10 +21,13 @@ const EditableField: React.FC<EditableFieldProps> = ({
   className,
   placeholder,
   isTextarea = false,
+  ...rest
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentValue, setCurrentValue] = useState(value);
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  // Fix: Use separate refs for input and textarea to resolve type conflicts.
+  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Update internal state if the external value prop changes
   useEffect(() => {
@@ -31,11 +36,16 @@ const EditableField: React.FC<EditableFieldProps> = ({
 
   // Focus the input when editing mode is activated
   useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
+    if (isEditing) {
+      if (isTextarea && textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.select();
+      } else if (!isTextarea && inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
+      }
     }
-  }, [isEditing]);
+  }, [isEditing, isTextarea]);
   
   const handleBlur = () => {
     setIsEditing(false);
@@ -62,18 +72,19 @@ const EditableField: React.FC<EditableFieldProps> = ({
 
   if (isEditing) {
     const commonProps = {
-      ref: inputRef,
       value: currentValue,
       onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setCurrentValue(e.target.value),
       onBlur: handleBlur,
       onKeyDown: handleKeyDown,
-      className: `${className} outline-none border border-blue-400 rounded-sm px-1 -my-px bg-white ring-2 ring-blue-200 w-full`,
+      className: `${className} outline-none border border-blue-400 rounded-sm px-1 -my-px bg-white ring-2 ring-blue-200 w-full editable-input-text`,
       placeholder: placeholder,
     };
     
     return isTextarea 
-      ? <textarea {...commonProps} rows={Math.max(3, currentValue.split('\n').length)} /> 
-      : <input type="text" {...commonProps} />;
+      // Fix: Pass specific ref to textarea
+      ? <textarea {...commonProps} ref={textareaRef} rows={Math.max(3, currentValue.split('\n').length)} /> 
+      // Fix: Pass specific ref to input
+      : <input type="text" {...commonProps} ref={inputRef} />;
   }
 
   // Display mode
@@ -83,6 +94,8 @@ const EditableField: React.FC<EditableFieldProps> = ({
       className={`${className} cursor-pointer hover:bg-blue-50/80 -my-px px-1 rounded-sm transition-colors duration-200 w-full`}
       title="Click to edit"
       dangerouslySetInnerHTML={{ __html: value || `<span class="text-gray-400 italic">${placeholder || ''}</span>`}}
+      // Fix: Spread additional props to support attributes like href for anchor tags.
+      {...rest}
     />
   );
 };

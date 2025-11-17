@@ -39,7 +39,7 @@ const ModernTemplate: React.FC<TemplateProps> = ({ data, setDataFromPath, fetchC
               {data.experience.map((job, index) => (
                 <div key={index}>
                   <div className="flex justify-between items-baseline mb-1">
-                    <EditableField as="h3" className="font-semibold text-lg" value={job.role} onUpdate={(v) => setDataFromPath(`experience.${index}.role`, v)} placeholder="Job Role"/>
+                    <EditableField as="h3" className="font-semibold text-lg text-gray-800" value={job.role} onUpdate={(v) => setDataFromPath(`experience.${index}.role`, v)} placeholder="Job Role"/>
                     <EditableField className="text-sm text-gray-600 text-right whitespace-nowrap ml-4" value={job.period} onUpdate={(v) => setDataFromPath(`experience.${index}.period`, v)} placeholder="Date Range"/>
                   </div>
                    <div className="flex justify-between items-baseline mb-2">
@@ -68,7 +68,7 @@ const ModernTemplate: React.FC<TemplateProps> = ({ data, setDataFromPath, fetchC
               {data.education.map((edu, index) => (
                 <div key={index}>
                   <div className="flex justify-between items-start">
-                    <EditableField as="h3" className="font-semibold" value={edu.degree} onUpdate={(v) => setDataFromPath(`education.${index}.degree`, v)} placeholder="Degree"/>
+                    <EditableField as="h3" className="font-semibold text-gray-800" value={edu.degree} onUpdate={(v) => setDataFromPath(`education.${index}.degree`, v)} placeholder="Degree"/>
                     <EditableField as="span" className="text-sm text-gray-600 ml-4 whitespace-nowrap" value={edu.period} onUpdate={(v) => setDataFromPath(`education.${index}.period`, v)} placeholder="Date Range"/>
                   </div>
                   <EditableField as="p" className="font-medium cv-text-primary" value={edu.university} onUpdate={(v) => setDataFromPath(`education.${index}.university`, v)} placeholder="University"/>
