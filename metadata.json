@@ -1,0 +1,5 @@
+{
+  "name": "AI Powered Resume Builder",
+  "description": "An intelligent resume builder that allows users to create a professional CV by manually inputting their details or by automatically parsing their existing resume using Gemini AI. The application provides a live preview and a print/PDF download option.",
+  "requestFramePermissions": []
+}

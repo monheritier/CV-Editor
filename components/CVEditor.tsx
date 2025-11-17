@@ -1,0 +1,246 @@
+import React from 'react';
+import type { CVData } from '../types';
+import { BrainCircuit } from './Icons';
+
+// Add global declarations for CDN scripts to satisfy TypeScript
+declare const pdfjsLib: any;
+declare const Tesseract: any;
+
+interface CVEditorProps {
+  data: CVData;
+  setData: React.Dispatch<React.SetStateAction<CVData>>;
+  onParseResume: (text: string) => void;
+  isParsing: boolean;
+  theme: string;
+  setTheme: (theme: string) => void;
+  font: string;
+  setFont: (font: string) => void;
+  template: string;
+  setTemplate: (template: string) => void;
+  fetchCompanyLogo: (index: number) => void;
+}
+
+const themes = [
+  { name: 'blue', color: '#2563eb' },
+  { name: 'teal', color: '#0d9488' },
+  { name: 'purple', color: '#7c3aed' },
+  { name: 'slate', color: '#475569' },
+];
+
+const fonts = [
+  { name: 'Inter', value: 'inter' },
+  { name: 'Roboto', value: 'roboto' },
+  { name: 'Lato', value: 'lato' },
+  { name: 'Merriweather', value: 'merriweather' },
+];
+
+const templates = [
+    { name: 'Classic', value: 'classic' },
+    { name: 'Modern', value: 'modern' },
+];
+
+const CVEditor: React.FC<CVEditorProps> = ({ data, setData, onParseResume, isParsing, theme, setTheme, font, setFont, template, setTemplate, fetchCompanyLogo }) => {
+  const [resumeText, setResumeText] = React.useState('');
+  const [ocrStatus, setOcrStatus] = React.useState<string>('');
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleParseClick = () => {
+    if (resumeText.trim()) {
+      onParseResume(resumeText);
+    }
+  };
+  
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.type === 'application/pdf') {
+        await handlePdfUpload(file);
+    } else if (file.type === 'text/plain') {
+        handleTxtUpload(file);
+    } else {
+        alert('Unsupported file type. Please upload a .txt or .pdf file.');
+    }
+    // Reset file input to allow uploading the same file again
+    if(fileInputRef.current) {
+        fileInputRef.current.value = '';
+    }
+  };
+
+  const handleTxtUpload = (file: File) => {
+    setOcrStatus('');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      setResumeText(text);
+    };
+    reader.readAsText(file);
+  };
+
+  const handlePdfUpload = async (file: File) => {
+    if (typeof pdfjsLib === 'undefined' || typeof Tesseract === 'undefined') {
+      alert('Required libraries for PDF processing are not loaded yet. Please try again in a moment.');
+      return;
+    }
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
+    setOcrStatus('Initializing PDF processing...');
+    setResumeText('');
+    
+    try {
+      const fileAsArrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument(fileAsArrayBuffer).promise;
+      const numPages = pdf.numPages;
+      const numWorkers = Math.min(navigator.hardwareConcurrency || 2, numPages);
+
+      setOcrStatus(`Initializing ${numWorkers} OCR workers...`);
+      const scheduler = Tesseract.createScheduler();
+      const workerPromises = Array.from({ length: numWorkers }, () => Tesseract.createWorker('eng'));
+      const workers = await Promise.all(workerPromises);
+      workers.forEach(worker => scheduler.addWorker(worker));
+      
+      let ocrPromises = [];
+      for (let i = 1; i <= numPages; i++) {
+        setOcrStatus(`Queueing page ${i}/${numPages} for OCR...`);
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 1.5 });
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        
+        if (context) {
+          await page.render({ canvasContext: context, viewport }).promise;
+          ocrPromises.push(scheduler.addJob('recognize', canvas));
+        }
+      }
+
+      setOcrStatus('Recognizing text across all pages...');
+      const results = await Promise.all(ocrPromises);
+      await scheduler.terminate();
+
+      const fullText = results.map(result => result.data.text).join('\n\n');
+      setResumeText(fullText);
+      setOcrStatus('');
+    } catch (error) {
+      console.error('Error processing PDF:', error);
+      setOcrStatus('Error processing PDF. Please try again.');
+      setTimeout(() => setOcrStatus(''), 5000);
+    }
+  };
+
+  const handleSimpleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    const keys = name.split('.');
+    if (keys.length === 1) {
+      setData(prev => ({ ...prev, [name]: value }));
+    } else if (keys.length === 2) {
+      setData(prev => ({
+        ...prev,
+        [keys[0]]: { ...(prev as any)[keys[0]], [keys[1]]: value }
+      }));
+    }
+  };
+
+  const isProcessing = isParsing || !!ocrStatus;
+
+  return (
+    <div className="w-full lg:w-2/5 p-8 bg-gray-100 h-screen overflow-y-auto print-hidden">
+      <h2 className="text-2xl font-bold mb-6 text-gray-800">Resume Editor</h2>
+      
+      <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+        <h3 className="text-lg font-semibold mb-4 text-blue-700 flex items-center gap-2">
+            <BrainCircuit size={20} />
+            Parse with AI
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+            Upload a PDF or TXT file, or paste your resume content below. The AI will populate the fields for you.
+        </p>
+        <textarea
+          className="w-full p-2 border rounded-md h-40 mb-4"
+          placeholder="Paste your resume here, or upload a file..."
+          value={resumeText}
+          onChange={(e) => setResumeText(e.target.value)}
+          disabled={isProcessing}
+        />
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <input ref={fileInputRef} type="file" accept=".txt,.pdf" onChange={handleFileChange} disabled={isProcessing} className="text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50" />
+            <button onClick={handleParseClick} disabled={isProcessing || !resumeText} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed w-full sm:w-auto">
+                {isParsing ? 'Parsing...' : 'Parse Resume'}
+            </button>
+        </div>
+         {ocrStatus && (
+            <div className="mt-4 text-sm text-center sm:text-left text-blue-600 animate-pulse">{ocrStatus}</div>
+        )}
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+        <h3 className="text-lg font-semibold mb-4 text-gray-800">Appearance</h3>
+        <div className="space-y-4">
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Color Theme</label>
+                <div className="flex space-x-3">
+                    {themes.map(t => (
+                        <button key={t.name} onClick={() => setTheme(t.name)} className={`w-8 h-8 rounded-full border-2 ${theme === t.name ? 'border-blue-500 ring-2 ring-blue-300' : 'border-gray-200'}`} style={{ backgroundColor: t.color }} title={t.name.charAt(0).toUpperCase() + t.name.slice(1)} />
+                    ))}
+                </div>
+            </div>
+             <div>
+                <label htmlFor="font-select" className="block text-sm font-medium text-gray-700 mb-2">Font Style</label>
+                <select id="font-select" value={font} onChange={e => setFont(e.target.value)} className="w-full p-2 border rounded-md bg-white">
+                    {fonts.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
+                </select>
+            </div>
+             <div>
+                <label htmlFor="template-select" className="block text-sm font-medium text-gray-700 mb-2">Template</label>
+                <select id="template-select" value={template} onChange={e => setTemplate(e.target.value)} className="w-full p-2 border rounded-md bg-white">
+                    {templates.map(t => <option key={t.value} value={t.value}>{t.name}</option>)}
+                </select>
+            </div>
+        </div>
+      </div>
+      
+      <div className={`space-y-6 ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="font-semibold mb-2 text-gray-700">Personal Details</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input name="name" value={data.name} onChange={handleSimpleChange} placeholder="Full Name" className="p-2 border rounded" />
+              <input name="title" value={data.title} onChange={handleSimpleChange} placeholder="Job Title" className="p-2 border rounded" />
+              <input name="contact.email" value={data.contact.email} onChange={handleSimpleChange} placeholder="Email" className="p-2 border rounded" />
+              <input name="contact.phone" value={data.contact.phone} onChange={handleSimpleChange} placeholder="Phone" className="p-2 border rounded" />
+              <input name="contact.location" value={data.contact.location} onChange={handleSimpleChange} placeholder="Location" className="p-2 border rounded" />
+              <input name="contact.github" value={data.contact.github} onChange={handleSimpleChange} placeholder="GitHub URL" className="p-2 border rounded" />
+              <input name="contact.linkedin" value={data.contact.linkedin} onChange={handleSimpleChange} placeholder="LinkedIn URL" className="p-2 border rounded" />
+          </div>
+           <textarea name="summary" value={data.summary} onChange={handleSimpleChange} placeholder="Summary" className="w-full mt-4 p-2 border rounded h-24" />
+        </div>
+        
+        <div className="bg-white p-4 rounded-lg shadow">
+            <h3 className="font-semibold mb-2 text-gray-700">Professional Experience</h3>
+            {data.experience.map((job, index) => (
+                <div key={index} className="mb-4 p-2 border-b">
+                    <input value={job.role} onChange={e => {
+                        const newExp = [...data.experience];
+                        newExp[index].role = e.target.value;
+                        setData(prev => ({...prev, experience: newExp}));
+                    }} placeholder="Role" className="p-2 border rounded w-full mb-2" />
+                    <input 
+                      value={job.company} 
+                      onBlur={() => fetchCompanyLogo(index)}
+                      onChange={e => {
+                        const newExp = [...data.experience];
+                        newExp[index].company = e.target.value;
+                        setData(prev => ({...prev, experience: newExp}));
+                      }} 
+                      placeholder="Company" 
+                      className="p-2 border rounded w-full" 
+                    />
+                </div>
+            ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CVEditor;
